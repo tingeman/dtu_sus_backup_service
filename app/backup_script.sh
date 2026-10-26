@@ -76,7 +76,7 @@ while IFS=" " read -r OPERATION _ ARG1 _ ARG2 FILTER_KW FILTER_GLOB; do
       RSYNC)
         if [ -z "$FILTER_KW" ]; then
           echo "Synchronizing (rsync) from $ARG1 to $DEST_PATH"
-          rsync -a --chmod=ugo=rw "$ARG1/" "$DEST_PATH/" || { echo "Rsync failed"; exit 1; }
+          rsync -a --chmod=Dugo=rwx,Fugo=rw "$ARG1/" "$DEST_PATH/" || { echo "Rsync failed"; exit 1; }
         elif [ "$FILTER_KW" = "ONLY" ]; then
           # Optional filter: RSYNC FROM <src> TO <dst> ONLY <glob>
           # Copy only top-level files matching the glob; never *.partial or dot files,
@@ -90,7 +90,7 @@ while IFS=" " read -r OPERATION _ ARG1 _ ARG2 FILTER_KW FILTER_GLOB; do
               ;;
           esac
           echo "Synchronizing (rsync) from $ARG1 to $DEST_PATH, only top-level files matching $GLOB"
-          rsync -a --chmod=ugo=rw \
+          rsync -a --chmod=Dugo=rwx,Fugo=rw \
             --exclude='/*.partial' --exclude='/.*' \
             --include="/$GLOB" --exclude='*' \
             "$ARG1/" "$DEST_PATH/" || { echo "Rsync failed"; exit 1; }

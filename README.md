@@ -1,4 +1,4 @@
-# backup-service
+# backup_service
 
 A small container image that runs scheduled backup and sync jobs with cron. It copies,
 archives and prunes folders on mounted storage. It contains no credentials and mounts
@@ -179,8 +179,8 @@ symbolic links, recent entries), the healthcheck and the self-test. It prints `P
 (exit 1).
 
 ```
-docker build -t backup-service:local .
-tests/run.sh backup-service:local
+docker build -t backup_service:local .
+tests/run.sh backup_service:local
 ```
 
 The deployment's build script runs `tests/run.sh` automatically on the image it builds from
@@ -202,7 +202,7 @@ The Dockerfile pins the base image by digest and installs the Python packages fr
 lock (`pip install --require-hashes`).
 
 ```
-docker build -t backup-service:local .
+docker build -t backup_service:local .
 ```
 
 To change the Python packages, edit `requirements.in` and regenerate the lock inside the
@@ -230,8 +230,8 @@ It runs as root, which cron needs.
 
 ```yaml
 services:
-  backup-service:
-    image: backup-service:local          # or the release you loaded
+  backup_service:
+    image: backup_service:local          # or the release you loaded
     restart: unless-stopped
     entrypoint: ["/entrypoint.sh"]
     volumes:

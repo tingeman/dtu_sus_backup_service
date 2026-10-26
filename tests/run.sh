@@ -1,8 +1,8 @@
 #!/bin/bash
-# Behaviour tests of the backup-service image. Run on the workstation (Linux or WSL) with
+# Behaviour tests of the backup_service image. Run on the workstation (Linux or WSL) with
 # the docker CLI against a built image:
 #
-#   tests/run.sh backup-service:local
+#   tests/run.sh backup_service:local
 #
 # Every container runs with --network none, has a name starting with a unique prefix, and
 # is removed at the end together with the temporary directories (files that containers
@@ -209,6 +209,14 @@ t_bs_rsync_plain() {
   expect "copied entries" "$(listing "$E/a")" "$(printf '%s\n' 'd all' 'f all/.hidden' 'f all/.hidden.tar.gz' 'f all/a.tar.gz' 'f all/b.tar.gz.partial' 'f all/d.txt' 'd all/sub' 'f all/sub/c.tar.gz' | sorted)"
 }
 
+t_bs_rsync_dir_mode() {
+  mkenv bs_dirmode
+  run_jobs 'RSYNC FROM /mnt/src/data TO /mnt/dest_a/modes' >/dev/null 2>&1 || fail_t "job runner failed"
+  local mode
+  mode="$(docker run --rm --network none --entrypoint stat -v "$E/a:/t:ro" "$IMAGE" -c %a /t/modes/sub)"
+  expect "mode of the created subdirectory" "$mode" "777"
+}
+
 t_bs_tar() {
   mkenv bs_tar
   run_jobs 'TAR FROM /mnt/src/data TO /mnt/dest_a/tars' >/dev/null 2>&1 || fail_t "job runner failed"
@@ -397,6 +405,7 @@ run_test "entrypoint refuses to start without a sentinel list" t_entry_no_list
 run_test "backup_script stops and writes nothing with a sentinel missing" t_bs_sentinel_missing
 run_test "backup_script RSYNC ONLY copies top-level matching files only" t_bs_rsync_only
 run_test "backup_script RSYNC without ONLY copies everything" t_bs_rsync_plain
+run_test "backup_script RSYNC gives created directories the execute bit" t_bs_rsync_dir_mode
 run_test "backup_script TAR creates a tarball" t_bs_tar
 run_test "backup_script COPY copies the folder content" t_bs_copy
 
