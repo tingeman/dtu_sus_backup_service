@@ -65,7 +65,7 @@ PURGE FOLDER <dir> USING <retention-config.yml>
 
 - `COPY`: `cp -r <src>/* <dst>/`.
 - `TAR`: creates `<dst>/<basename of src>_<YYYYMMDD_HHMMSS>.tar.gz` of the source's content.
-- `RSYNC`: `rsync -a --chmod=ugo=rw <src>/ <dst>/`. No `--delete`: files removed at the
+- `RSYNC`: `rsync -a --chmod=Dugo=rwx,Fugo=rw <src>/ <dst>/`. No `--delete`: files removed at the
   source stay at the destination.
 - `RSYNC ... ONLY <glob>`: copy only top-level files whose name matches the glob. Files
   ending in `.partial`, dot files and subdirectories are never copied. The glob may be

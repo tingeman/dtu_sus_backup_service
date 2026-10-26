@@ -48,7 +48,7 @@ sorted() { LC_ALL=C sort; }
 plain() { docker run --rm --network none --entrypoint sh "$IMAGE" -c "$1"; }
 
 # Entries under a directory as "<type> <path>", without the sentinel files. Listed by a
-# container (as root): rsync --chmod=ugo=rw leaves directories the workstation user cannot enter.
+# container (as root): files written by containers are owned by root.
 listing() {
   docker run --rm --network none --entrypoint find -v "$1:/t:ro" -w /t "$IMAGE" . -mindepth 1 -not -name '.mounted_*' -printf '%y %P\n' | sorted
 }
