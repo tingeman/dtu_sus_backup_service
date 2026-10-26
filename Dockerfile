@@ -15,11 +15,20 @@ WORKDIR /backup
 COPY ./app/backup_script.sh ./backup_script.sh
 COPY ./app/check_sentinels.sh ./check_sentinels.sh
 COPY ./app/apply_retention_policy.py ./apply_retention_policy.py
+COPY ./app/selftest.sh ./selftest.sh
+COPY ./app/healthcheck.sh ./healthcheck.sh
 COPY ./requirements.txt ./requirements.txt
 
 RUN set -ex && \
     python -m pip install --no-cache-dir --require-hashes -r ./requirements.txt
 
-RUN chmod +x /entrypoint.sh /backup/backup_script.sh /backup/check_sentinels.sh /backup/apply_retention_policy.py
+RUN chmod +x /entrypoint.sh /backup/backup_script.sh /backup/check_sentinels.sh /backup/apply_retention_policy.py \
+    /backup/selftest.sh /backup/healthcheck.sh
+
+# Healthy = every sentinel present and cron running (see healthcheck.sh). start-interval
+# (Docker Engine 25+) checks every 2 s during the start period, so `docker compose up --wait`
+# does not wait a full interval.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=20s --start-interval=2s --retries=3 \
+    CMD ["/backup/healthcheck.sh"]
 
 ENTRYPOINT ["/entrypoint.sh"]

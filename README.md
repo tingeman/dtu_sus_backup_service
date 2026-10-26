@@ -15,6 +15,8 @@ tool, `sudo`, `curl`, editors. All configuration is bind-mounted at run time.
 | `/backup/backup_script.sh` | job runner; argument 1 is the job file (default `/backup/backup_folders.conf`) |
 | `/backup/check_sentinels.sh` | sentinel check, used by the entrypoint and the job runner |
 | `/backup/apply_retention_policy.py` | retention policy for `PURGE` jobs |
+| `/backup/selftest.sh` | self-test of a configured container, run with `docker exec` (see below) |
+| `/backup/healthcheck.sh` | the Docker `HEALTHCHECK` command (see below) |
 | `/backup/backup_folders.conf`, `/backup/sync_folders.conf` | job files (mount read-only); any path works if the cron entry names it |
 | `/backup/retention_config.yml` | retention policy (mount read-only) |
 | `/backup/sentinels.conf` | list of sentinel files (mount read-only), required |
@@ -122,6 +124,77 @@ Job output goes wherever the cron line sends it; the example appends to
 `/var/log/backup.log` inside the container. Entrypoint output is the container log
 (`docker logs`). Mount a volume at `/var/log` (or a file at `/var/log/backup.log`) to keep
 the job log across container re-creation. Rotate it on the outside.
+
+## Healthcheck
+
+The image has a Docker `HEALTHCHECK` that runs `/backup/healthcheck.sh` every 60 s
+(timeout 10 s, 3 retries, 20 s start period, and a check every 2 s during the start period).
+It is light and read-only: healthy means every sentinel in `/backup/sentinels.conf` exists
+and `cron` is running. The failing reason is in `docker inspect` under `.State.Health.Log`.
+
+The 2 s start-up interval (`--start-interval`) needs Docker Engine 25 or newer. The hosts run
+a current Docker Engine from Docker's apt repository. On an older engine the option is
+ignored and the container becomes healthy after the first regular interval instead.
+
+`docker compose up -d --wait` waits for the container to be healthy, so a deployment fails
+(instead of reporting success) when a share is not mounted.
+
+## Self-test
+
+`/backup/selftest.sh` checks a configured, running container, for use on the host after a
+deployment:
+
+```
+docker exec <container> /backup/selftest.sh
+docker exec <container> /backup/selftest.sh --sentinels <sentinel-list> <job-file> [<job-file> ...]
+```
+
+Without arguments it uses `/backup/sentinels.conf`, `/backup/backup_folders.conf` and
+`/backup/sync_folders.conf`. It prints one line per check (`ok:` or `FAIL:`, naming the file,
+line and cause) and ends with `SELFTEST PASSED` (exit 0) or `SELFTEST FAILED: <n> problem(s)`
+(exit 1). It checks:
+
+- all sentinels exist, and cron is running;
+- every job line is a known operation with the expected fields, and every source folder
+  exists;
+- every retention file used by a `PURGE` line exists and loads (YAML, the same settings
+  model and `PolicyBuilder` as `apply_retention_policy.py`);
+- every distinct destination (and `PURGE` folder) is writable. It creates and deletes a file
+  `.selftest_<timestamp>_<pid>` in the destination, or, when the destination does not exist
+  yet, in its nearest existing parent. It never creates the destination, and it only writes
+  below a sentinel's directory: a destination outside the sentinel-protected mounts is
+  reported as a problem and not touched.
+
+Apart from that temporary file it changes nothing.
+
+## Tests
+
+`tests/run.sh <image>` runs behaviour tests against a built image with the docker CLI only
+(Linux or WSL). Every container runs with `--network none`, and all containers and temporary
+folders are removed at the end. It covers: image contents (tools present and absent, Python
+packages, script syntax), the entrypoint with and without sentinels, the job runner (sentinel
+check, `RSYNC ... ONLY`, plain `RSYNC`, `TAR`, `COPY`), the retention policy (old folders,
+symbolic links, recent entries), the healthcheck and the self-test. It prints `PASS:` or
+`FAIL:` per check and ends with `ALL <n> TESTS PASSED` (exit 0) or `<m> OF <n> TESTS FAILED`
+(exit 1).
+
+```
+docker build -t backup-service:local .
+tests/run.sh backup-service:local
+```
+
+The deployment's build script runs `tests/run.sh` automatically on the image it builds from
+a checkout of a commit or tag, and writes no release bundle when it fails. Run it yourself
+before tagging a release.
+
+## How a deployment uses this
+
+- Mount the sentinel list, job files, retention policy and cron files as shown below, and
+  start the container normally. The image's healthcheck applies without any compose option.
+- After the container is up, run `docker exec <container> /backup/selftest.sh` and fail the
+  deployment if it exits non-zero. With Ansible this is a post-start check on the container.
+- Use `docker compose up -d --wait` so that a container that is not healthy fails the
+  deployment.
 
 ## Build
 
